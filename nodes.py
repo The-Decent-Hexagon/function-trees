@@ -9,14 +9,14 @@ class NumNode:
     def derivative(self):
         return NumNode(0)
 
-    def sub(self, num):
-        return NumNode(self.val - num.val)
-
     def simplify(self):
         return self
 
     def solve(self, vars):
         return self.val
+
+    def has_variables(self):
+        return False
 
     def __eq__(self, other):
         if(type(other) == NumNode):
@@ -39,6 +39,9 @@ class VarNode:
     def solve(self, vars):
         return vars[self.name]
 
+    def has_variables(self):
+        return True
+
     def __eq__(self, other):
         if(type(other) != VarNode): return False
         return self.name == other.name
@@ -52,6 +55,7 @@ class AddNode:
         self.right = right
 
     def derivative(self):
+        if(not self.left.has_variables() and not self.right.has_variables()): return NumNode(0)
         return AddNode(self.left.derivative(), self.right.derivative())
 
     def simplify(self):
@@ -74,9 +78,12 @@ class AddNode:
 
         return left + right
 
+    def has_variables(self):
+        return self.left.has_variables() or self.right.has_variables()
+
     def __eq__(self, other):
-        if(type(other) in [NumNode, VarNode]): return False
-        return self.left == other.left and self.right == other.right
+        if(type(other) != AddNode): return False
+        return (self.left == other.left and self.right == other.right) or (self.left == other.right and other.right == self.left)
 
     def __repr__(self):
         return f"({self.left} + {self.right})"
@@ -87,6 +94,7 @@ class SubNode:
         self.right = right
 
     def derivative(self):
+        if(not self.left.has_variables() and not self.right.has_variables()): return NumNode(0)
         return SubNode(self.left.derivative(), self.right.derivative())
 
     def simplify(self):
@@ -114,6 +122,9 @@ class SubNode:
 
         return left - right
 
+    def has_variables(self):
+        return self.left.has_variables() or self.right.has_variables()
+
     def __eq__(self, other):
         if(type(other) in [NumNode, VarNode]): return False
         return self.left == other.left and self.right == other.right
@@ -129,6 +140,7 @@ class MultNode:
         self.right = right
 
     def derivative(self):
+        if(not self.left.has_variables() and not self.right.has_variables()): return NumNode(0)
         return AddNode(MultNode(self.left, self.right.derivative()), MultNode(self.left.derivative(), self.right))
 
     def simplify(self):
@@ -174,9 +186,12 @@ class MultNode:
 
         return left * right
 
+    def has_variables(self):
+        return self.left.has_variables() or self.right.has_variables()
+
     def __eq__(self, other):
-        if(type(other) in [NumNode, VarNode]): return False
-        return self.left == other.left and self.right == other.right
+        if (type(other) != MultNode): return False
+        return (self.left == other.left and self.right == other.right) or (self.left == other.right and other.right == self.left)
 
     def __repr__(self):
         return f"({self.left} * {self.right})"
@@ -187,6 +202,7 @@ class DivNode:
         self.right = right
 
     def derivative(self):
+        if(not self.left.has_variables() and not self.right.has_variables()): return NumNode(0)
         return DivNode(SubNode(MultNode(self.right, self.left.derivative()), MultNode(self.left, self.right.derivative())), PowNode(self.right, NumNode(2)))
 
     def simplify(self):
@@ -243,6 +259,9 @@ class DivNode:
 
         return left / right
 
+    def has_variables(self):
+        return self.left.has_variables() or self.right.has_variables()
+
     def __repr__(self):
         return f"({self.left} / {self.right})"
 
@@ -252,6 +271,7 @@ class PowNode:
         self.right = right
 
     def derivative(self):
+        if(not self.left.has_variables() and not self.right.has_variables()): return NumNode(0)
         if(type(self.left) == NumNode and type(self.right) == NumNode): return NumNode(0) # not needed but for speed and simplification
         if(type(self.left) == VarNode and type(self.right) == VarNode): return MultNode(PowNode(VarNode(self.left.name), VarNode(self.left.name)), AddNode(NumNode(1), LogNode(e, VarNode(self.left.name)))) # not needed but for speed and simplification
         if(type(self.left) == VarNode and type(self.right) == NumNode): return MultNode(self.right, PowNode(self.left, SubNode(self.right, NumNode(1)))) # not needed but for speed and simplification
@@ -286,6 +306,9 @@ class PowNode:
 
         return left ** right
 
+    def has_variables(self):
+        return self.left.has_variables() or self.right.has_variables()
+
     def __eq__(self, other):
         if(type(other) in [NumNode, VarNode, str]): return False
         return self.left == other.left and self.right == other.right
@@ -318,6 +341,7 @@ class LogNode:
         return self
 
     def derivative(self):
+        if(not self.left.has_variables() and not self.right.has_variables()): return NumNode(0)
         if(type(self.left) in [NumNode, str]):
             return DivNode(self.right.derivative(), MultNode(self.right, LogNode(e, self.left)))
 
@@ -328,6 +352,9 @@ class LogNode:
         right = self.right.solve(vars)
 
         return math.log(right, left)
+
+    def has_variables(self):
+        return self.left.has_variables() or self.right.has_variables()
 
     def __eq__(self, other):
         if(type(other) in [NumNode, VarNode, str]): return False
@@ -349,12 +376,16 @@ class SinNode:
         return self
 
     def derivative(self):
+        if(not self.node.has_variables()): return NumNode(0)
         return MultNode(CosNode(self.node), self.node.derivative())
 
     def solve(self, vars):
         node = self.node.solve(vars)
 
         return math.sin(node)
+
+    def has_variables(self):
+        return self.node.has_variables()
 
     def __repr__(self):
         return f"sin{self.node}"
@@ -368,12 +399,16 @@ class CosNode:
         return self
 
     def derivative(self):
+        if(not self.node.has_variables()): return NumNode(0)
         return MultNode(SubNode(NumNode(0), SinNode(self.node)), self.node.derivative())
 
     def solve(self, vars):
         node = self.node.solve(vars)
 
         return math.cos(node)
+
+    def has_variables(self):
+        return self.node.has_variables()
 
     def __repr__(self):
         return f"cos{self.node}"
